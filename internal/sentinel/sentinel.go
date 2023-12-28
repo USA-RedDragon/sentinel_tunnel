@@ -26,6 +26,7 @@ type Connection struct {
 const (
 	clientClosed    = true
 	clientNotClosed = false
+	dialTimeout     = 300 * time.Millisecond
 )
 
 func (c *Connection) parseResponse() (request []string, err error, isClientClosed bool) {
@@ -120,7 +121,7 @@ func (c *Connection) reconnectToSentinel() bool {
 		}
 
 		var err error
-		c.currentConnection, err = net.DialTimeout("tcp", sentinelAddr, 300*time.Millisecond)
+		c.currentConnection, err = net.DialTimeout("tcp", sentinelAddr, dialTimeout)
 		if err == nil {
 			c.reader = bufio.NewReader(c.currentConnection)
 			c.writer = bufio.NewWriter(c.currentConnection)
