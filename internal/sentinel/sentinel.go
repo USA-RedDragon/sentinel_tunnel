@@ -7,6 +7,8 @@ import (
 	"net"
 	"strconv"
 	"time"
+
+	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
 )
 
 type GetMasterAddrReply struct {
@@ -82,15 +84,13 @@ func (c *Connection) parseResponse() ([]string, bool, error) {
 }
 
 func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, bool, error) {
-	getMasterCmd := "*3\r\n" +
-		"$8\r\n" +
-		"sentinel\r\n" +
-		"$23\r\n" +
-		"get-master-addr-by-name\r\n" +
-		"$%d\r\n" +
-		"%s\r\n"
+	getMasterCmd := resp.Array{
+		resp.BulkString("sentinel"),
+		resp.BulkString("get-master-addr-by-name"),
+		resp.BulkString(dbName),
+	}
 
-	_, err := c.writer.WriteString(fmt.Sprintf(getMasterCmd, len(dbName), dbName))
+	_, err := c.writer.WriteString(getMasterCmd.String())
 	if err != nil {
 		return []string{}, clientClosed, fmt.Errorf("%w: %w", ErrWriteFailed, err)
 	}
