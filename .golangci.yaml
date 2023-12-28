@@ -33,7 +33,6 @@ linters:
     - godox
     - goerr113
     - gofmt
-    - goheader
     - gomnd
     - gomoddirectives
     - gosec
@@ -58,7 +57,3 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-
-linters-settings:
-  goheader:
-    template-path: .copyright-header
