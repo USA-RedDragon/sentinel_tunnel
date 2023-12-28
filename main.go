@@ -144,7 +144,7 @@ func (stClient *SentinelTunnellingClient) ListenAndServe(ctx context.Context) er
 }
 
 func main() {
-	infoLog.Printf("Redis Sentinel Tunnel %s (%s built %s)\n", version, string([]byte(commit)[:7]), date)
+	infoLog.Printf("Redis Sentinel Tunnel %s (%s built %s)\n", version, commit, date)
 	if len(os.Args) < expectedArgs {
 		fatalLog.Printf("not enough arguments\n")
 		fatalLog.Printf("usage: %s <config_file_path>\n", os.Args[0])
