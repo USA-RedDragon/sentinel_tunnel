@@ -122,6 +122,7 @@ func handleSingleDbConnections(listeningPort string, dbName string,
 
 func (stClient *SentinelTunnellingClient) Start() {
 	for _, dbConf := range stClient.configuration.Databases {
+		dbConf := dbConf
 		go handleSingleDbConnections(dbConf.LocalPort, dbConf.Name,
 			stClient.sentinelConnection.GetAddressByDbName)
 	}
