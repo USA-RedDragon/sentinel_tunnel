@@ -103,7 +103,6 @@ func handleConnection(c net.Conn, dbName string,
 
 func handleSingleDbConnections(listeningPort string, dbName string,
 	getDBAddressByName GetDBAddressByNameFunction) {
-
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", listeningPort))
 	if err != nil {
 		fatalLog.Printf("cannot listen to port %s: %v\n", listeningPort, err.Error())
@@ -119,7 +118,6 @@ func handleSingleDbConnections(listeningPort string, dbName string,
 		}
 		go handleConnection(conn, dbName, getDBAddressByName)
 	}
-
 }
 
 func (stClient *SentinelTunnellingClient) Start() {
