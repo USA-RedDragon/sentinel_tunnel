@@ -112,7 +112,6 @@ func (c *Connection) retrieveAddressByDbName() {
 
 func (c *Connection) reconnectToSentinel() bool {
 	for _, sentinelAddr := range c.sentinelsAddresses {
-
 		if c.currentConnection != nil {
 			c.currentConnection.Close()
 			c.reader = nil
