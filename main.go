@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel"
 )
@@ -140,6 +139,6 @@ func main() {
 	stClient := NewSentinelTunnellingClient(os.Args[1])
 	stClient.Start()
 	for {
-		time.Sleep(1000 * time.Millisecond)
+		select {}
 	}
 }
