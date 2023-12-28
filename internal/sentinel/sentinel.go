@@ -29,7 +29,7 @@ const (
 	dialTimeout     = 300 * time.Millisecond
 )
 
-func (c *Connection) parseResponse() (request []string, err error, isClientClosed bool) {
+func (c *Connection) parseResponse() ([]string, error, bool) {
 	var ret []string
 	buf, _, e := c.reader.ReadLine()
 	if e != nil {
@@ -71,7 +71,7 @@ func (c *Connection) parseResponse() (request []string, err error, isClientClose
 	return ret, nil, clientNotClosed
 }
 
-func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) (addr []string, returnedErr error, isClientClosed bool) {
+func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, error, bool) {
 	c.writer.WriteString("*3\r\n")
 	c.writer.WriteString("$8\r\n")
 	c.writer.WriteString("sentinel\r\n")
