@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 
@@ -25,16 +25,6 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
-
-	infoLog = log.New(os.Stdout,
-		"INFO: ",
-		log.Ldate|log.Ltime)
-	errorLog = log.New(os.Stderr,
-		"ERROR: ",
-		log.Ldate|log.Ltime)
-	fatalLog = log.New(os.Stderr,
-		"FATAL: ",
-		log.Ldate|log.Ltime)
 )
 
 type SentinelTunnellingDbConfig struct {
@@ -72,7 +62,7 @@ func NewSentinelTunnellingClient(configPath string) (*SentinelTunnellingClient, 
 		return nil, fmt.Errorf("an error has occur during sentinel connection creation: %w", err)
 	}
 
-	infoLog.Println("done initializing tunnelling")
+	slog.Info("done initializing tunnelling")
 
 	return &tunnellingClient, nil
 }
@@ -86,13 +76,13 @@ func handleConnection(c net.Conn, dbName string,
 	getDBAddressByName GetDBAddressByNameFunction) {
 	dbAddress, err := getDBAddressByName(dbName)
 	if err != nil {
-		errorLog.Printf("cannot get db address for %s: %v\n", dbName, err.Error())
+		slog.Error("cannot get db address", "db", dbName, "error", err.Error())
 		c.Close()
 		return
 	}
 	dbConn, err := net.Dial("tcp", dbAddress)
 	if err != nil {
-		errorLog.Printf("cannot connect to db %s: %v\n", dbName, err.Error())
+		slog.Error("cannot connect to db", "db", dbName, "error", err.Error())
 		c.Close()
 		return
 	}
@@ -115,7 +105,7 @@ func handleSingleDbConnections(ctx context.Context, listeningPort string, dbName
 		_ = listener.Close()
 	}()
 
-	infoLog.Printf("listening on port %s for connections to database: %s\n", listeningPort, dbName)
+	slog.Info("listening for connections to database", "port", listeningPort, "db", dbName)
 
 	for {
 		conn, err := listener.Accept()
@@ -144,19 +134,19 @@ func (stClient *SentinelTunnellingClient) ListenAndServe(ctx context.Context) er
 }
 
 func main() {
-	infoLog.Printf("Redis Sentinel Tunnel %s (%s built %s)\n", version, commit, date)
+	slog.Info("Redis Sentinel Tunnel", "version", version, "commit", commit, "date", date)
 	if len(os.Args) < expectedArgs {
-		fatalLog.Printf("not enough arguments\n")
-		fatalLog.Printf("usage: %s <config_file_path>\n", os.Args[0])
+		slog.Error("not enough arguments")
+		slog.Error("usage:" + os.Args[0] + " <config_file_path>")
 		os.Exit(1)
 	}
 	stClient, err := NewSentinelTunnellingClient(os.Args[1])
 	if err != nil {
-		fatalLog.Println(err.Error())
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 	if err := stClient.ListenAndServe(context.Background()); err != nil {
-		fatalLog.Println(err.Error())
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 }
