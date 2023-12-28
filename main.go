@@ -51,8 +51,8 @@ type SentinelTunnellingClient struct {
 
 type GetDBAddressByNameFunction func(dbName string) (string, error)
 
-func NewSentinelTunnellingClient(config_file_location string) *SentinelTunnellingClient {
-	data, err := os.ReadFile(config_file_location)
+func NewSentinelTunnellingClient(configPath string) *SentinelTunnellingClient {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		fatalLog.Printf("an error has occur during configuration read: %v\n", err.Error())
 		os.Exit(1)
