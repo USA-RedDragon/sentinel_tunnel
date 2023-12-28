@@ -12,6 +12,10 @@ import (
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel"
 )
 
+const (
+	expectedArgs = 2
+)
+
 // https://goreleaser.com/cookbooks/using-main.version/
 //
 //nolint:golint,gochecknoglobals
@@ -128,7 +132,7 @@ func (stClient *SentinelTunnellingClient) Start() {
 
 func main() {
 	infoLog.Printf("Redis Sentinel Tunnel %s (%s built %s)\n", version, string([]byte(commit)[:7]), date)
-	if len(os.Args) < 2 {
+	if len(os.Args) < expectedArgs {
 		fatalLog.Printf("not enough arguments\n")
 		fatalLog.Printf("usage: %s <config_file_path>\n", os.Args[0])
 		return
