@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -77,10 +78,9 @@ func NewSentinelTunnellingClient(configPath string) *SentinelTunnellingClient {
 	return &tunnellingClient
 }
 
-func createTunnelling(conn1 net.Conn, conn2 net.Conn) {
-	io.Copy(conn1, conn2)
-	conn1.Close()
-	conn2.Close()
+func createTunnelling(conn1 net.Conn, conn2 net.Conn) error {
+	_, err := io.Copy(conn1, conn2)
+	return errors.Join(err, conn1.Close(), conn2.Close())
 }
 
 func handleConnection(c net.Conn, dbName string,
@@ -97,8 +97,12 @@ func handleConnection(c net.Conn, dbName string,
 		c.Close()
 		return
 	}
-	go createTunnelling(c, dbConn)
-	go createTunnelling(dbConn, c)
+	go func() {
+		_ = createTunnelling(c, dbConn)
+	}()
+	go func() {
+		_ = createTunnelling(dbConn, c)
+	}()
 }
 
 func handleSingleDbConnections(listeningPort string, dbName string,
