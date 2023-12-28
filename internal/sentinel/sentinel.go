@@ -29,77 +29,94 @@ const (
 	dialTimeout     = 300 * time.Millisecond
 )
 
-func (c *Connection) parseResponse() ([]string, error, bool) {
+var (
+	ErrReadFailed      = errors.New("failed read line from client")
+	ErrWriteFailed     = errors.New("failed write to client")
+	ErrInvalidResponse = errors.New("invalid response")
+	ErrNullRequest     = errors.New("null request")
+	ErrWrongBulkSize   = errors.New("wrong bulk size")
+	ErrDbName          = errors.New("failed to retrieve db name from the sentinel")
+	ErrConnect         = errors.New("failed to connect to any of the sentinel services")
+)
+
+func (c *Connection) parseResponse() ([]string, bool, error) {
 	var ret []string
 	buf, _, e := c.reader.ReadLine()
 	if e != nil {
-		return nil, errors.New("failed read line from client"), clientClosed
+		return nil, clientClosed, ErrReadFailed
 	}
 	if len(buf) == 0 {
-		return nil, errors.New("failed read line from client"), clientClosed
+		return nil, clientClosed, ErrReadFailed
 	}
 	if buf[0] != '*' {
-		return nil, errors.New("first char in mbulk is not *"), clientNotClosed
+		return nil, clientNotClosed, fmt.Errorf("%w: %s", ErrInvalidResponse, "first char in mbulk is not *")
 	}
 	mbulkSize, _ := strconv.Atoi(string(buf[1:]))
 	if mbulkSize == -1 {
-		return nil, errors.New("null request"), clientNotClosed
+		return nil, clientNotClosed, ErrNullRequest
 	}
 	ret = make([]string, mbulkSize)
 	for i := 0; i < mbulkSize; i++ {
 		buf1, _, e1 := c.reader.ReadLine()
 		if e1 != nil {
-			return nil, errors.New("failed read line from client"), clientClosed
+			return nil, clientClosed, ErrReadFailed
 		}
 		if len(buf1) == 0 {
-			return nil, errors.New("failed read line from client"), clientClosed
+			return nil, clientClosed, ErrReadFailed
 		}
 		if buf1[0] != '$' {
-			return nil, errors.New("first char in bulk is not $"), clientNotClosed
+			return nil, clientNotClosed, fmt.Errorf("%w: %s", ErrInvalidResponse, "first char in bulk is not $")
 		}
 		bulkSize, _ := strconv.Atoi(string(buf1[1:]))
 		buf2, _, e2 := c.reader.ReadLine()
 		if e2 != nil {
-			return nil, errors.New("failed read line from client"), clientClosed
+			return nil, clientClosed, ErrReadFailed
 		}
 		bulk := string(buf2)
 		if len(bulk) != bulkSize {
-			return nil, errors.New("wrong bulk size"), clientNotClosed
+			return nil, clientNotClosed, ErrWrongBulkSize
 		}
 		ret[i] = bulk
 	}
-	return ret, nil, clientNotClosed
+	return ret, clientNotClosed, nil
 }
 
-func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, error, bool) {
-	c.writer.WriteString("*3\r\n")
-	c.writer.WriteString("$8\r\n")
-	c.writer.WriteString("sentinel\r\n")
-	c.writer.WriteString("$23\r\n")
-	c.writer.WriteString("get-master-addr-by-name\r\n")
-	c.writer.WriteString(fmt.Sprintf("$%d\r\n", len(dbName)))
-	c.writer.WriteString(dbName)
-	c.writer.WriteString("\r\n")
-	c.writer.Flush()
+func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, bool, error) {
+	getMasterCmd := "*3\r\n" +
+		"$8\r\n" +
+		"sentinel\r\n" +
+		"$23\r\n" +
+		"get-master-addr-by-name\r\n" +
+		"$%d\r\n" +
+		"%s\r\n"
+
+	_, err := c.writer.WriteString(fmt.Sprintf(getMasterCmd, len(dbName), dbName))
+	if err != nil {
+		return []string{}, clientClosed, fmt.Errorf("%w: %w", ErrWriteFailed, err)
+	}
+
+	if err := c.writer.Flush(); err != nil {
+		return []string{}, clientClosed, fmt.Errorf("%w: %w", ErrWriteFailed, err)
+	}
 
 	return c.parseResponse()
 }
 
 func (c *Connection) retrieveAddressByDbName() {
 	for dbName := range c.getMasterAddressByName {
-		addr, err, isClientClosed := c.getMasterAddrByNameFromSentinel(dbName)
+		addr, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName)
 		if err != nil {
 			fmt.Println("err: ", err.Error())
 			if !isClientClosed {
 				c.getMasterAddressByNameReply <- &GetMasterAddrReply{
 					reply: "",
-					err:   errors.New("failed to retrieve db name from the sentinel, db_name:" + dbName),
+					err:   fmt.Errorf("%w: %s", ErrDbName, dbName),
 				}
 			}
 			if !c.reconnectToSentinel() {
 				c.getMasterAddressByNameReply <- &GetMasterAddrReply{
 					reply: "",
-					err:   errors.New("failed to connect to any of the sentinel services"),
+					err:   ErrConnect,
 				}
 			}
 			continue
@@ -149,7 +166,7 @@ func NewConnection(addresses []string) (*Connection, error) {
 	}
 
 	if !connection.reconnectToSentinel() {
-		return nil, errors.New("could not connect to any sentinels")
+		return nil, ErrConnect
 	}
 
 	go connection.retrieveAddressByDbName()
