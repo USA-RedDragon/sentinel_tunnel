@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 	"time"
@@ -130,7 +131,7 @@ func (c *Connection) retrieveAddressByDbName(password string) {
 	for dbName := range c.getMasterAddressByName {
 		response, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, password)
 		if err != nil {
-			fmt.Println("err: ", err.Error())
+			slog.Error("failed to get master", "error", err.Error())
 			if !isClientClosed {
 				var reply string
 				if len(response) != 0 {
@@ -172,7 +173,7 @@ func (c *Connection) reconnectToSentinel() bool {
 			c.writer = bufio.NewWriter(c.currentConnection)
 			return true
 		}
-		fmt.Println(err.Error())
+		slog.Error("failed to reconnect to Sentinel", "error", err.Error())
 	}
 	return false
 }
