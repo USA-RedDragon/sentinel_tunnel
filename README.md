@@ -56,6 +56,7 @@ For example, the following config file contains two Sentinel addresses and two d
         "node1.local:8001",
         "node2.local:8001"
     ],
+    "Password": "",
     "Databases":[
         {
             "Name":"db1",
