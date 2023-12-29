@@ -1,6 +1,6 @@
 FROM scratch
 
-COPY --from=alpine:latest /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=alpine:3.19 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY sentinel_tunnel /
 
