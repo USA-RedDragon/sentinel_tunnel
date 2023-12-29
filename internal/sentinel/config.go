@@ -68,7 +68,7 @@ func LoadConfig(cmd *cobra.Command) (TunnellingConfiguration, error) {
 		}
 		optName := strings.ToUpper(f.Name)
 		optName = strings.ReplaceAll(optName, "-", "_")
-		varName := "TUNNEL_" + optName
+		varName := "ST_" + optName
 		if val, ok := os.LookupEnv(varName); !f.Changed && ok {
 			if err := f.Value.Set(val); err != nil {
 				cancel(err)
