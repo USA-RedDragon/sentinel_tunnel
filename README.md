@@ -46,6 +46,7 @@ export PATH=$PATH:$GOPATH/bin
 The code contains an example configuration file named `configuration_example.json`. The configuration file is a json file that contains the following information:
 
 * The Sentinels addresses list
+* Optionally, the Sentinel password
 * The list of databases and their corresponding local port
 
 For example, the following config file contains two Sentinel addresses and two databases. When the client connects to the local port `12345` it actually connect to `db1`.
