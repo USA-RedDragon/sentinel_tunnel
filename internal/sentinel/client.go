@@ -25,10 +25,7 @@ func NewTunnellingClient(config TunnellingConfiguration) (*TunnellingClient, err
 	}
 
 	var err error
-	tunnellingClient.sentinelConnection, err = NewConnection(
-		tunnellingClient.configuration.SentinelsAddressesList,
-		tunnellingClient.configuration.Password,
-	)
+	tunnellingClient.sentinelConnection, err = NewConnection(tunnellingClient.configuration)
 	if err != nil {
 		return nil, fmt.Errorf("an error has occur during sentinel connection creation: %w", err)
 	}
@@ -43,12 +40,15 @@ func createTunnelling(conn1 net.Conn, conn2 net.Conn) error {
 	return errors.Join(err, conn1.Close(), conn2.Close())
 }
 
-func handleConnection(c net.Conn, dbName string,
-	getDBAddressByName GetDBAddressByNameFunction) {
-	response, err := getDBAddressByName(dbName)
+func handleConnection(c net.Conn, client *TunnellingClient, dbName string) {
+	response, err := client.sentinelConnection.GetAddressByDbName(dbName)
 	if err != nil {
 		slog.Error("cannot get db address", "db", dbName, "error", err.Error())
-		_, _ = c.Write([]byte(resp.SimpleError("ERR Tunnel failed to get db: " + response).String()))
+		if response != "" {
+			_, _ = c.Write([]byte(resp.SimpleError("ERR Tunnel failed to get db: " + response).String()))
+		} else {
+			_, _ = c.Write([]byte(resp.SimpleError("ERR Tunnel failed to get db: " + err.Error()).String()))
+		}
 		c.Close()
 		return
 	}
@@ -67,8 +67,7 @@ func handleConnection(c net.Conn, dbName string,
 	}()
 }
 
-func handleSingleDbConnections(ctx context.Context, listeningPort string, dbName string,
-	getDBAddressByName GetDBAddressByNameFunction) error {
+func handleSingleDbConnections(ctx context.Context, client *TunnellingClient, listeningPort string, dbName string) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", listeningPort))
 	if err != nil {
 		return fmt.Errorf("cannot listen to port %s: %w", listeningPort, err)
@@ -85,7 +84,7 @@ func handleSingleDbConnections(ctx context.Context, listeningPort string, dbName
 		if err != nil {
 			return fmt.Errorf("cannot accept connections on port %s: %w", listeningPort, err)
 		}
-		go handleConnection(conn, dbName, getDBAddressByName)
+		go handleConnection(conn, client, dbName)
 	}
 }
 
@@ -96,9 +95,9 @@ func (stClient *TunnellingClient) ListenAndServe(ctx context.Context) error {
 		group.Go(func() error {
 			return handleSingleDbConnections(
 				ctx,
+				stClient,
 				dbConf.LocalPort,
 				dbConf.Name,
-				stClient.sentinelConnection.GetAddressByDbName,
 			)
 		})
 	}

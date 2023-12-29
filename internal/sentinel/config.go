@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -16,6 +17,8 @@ type TunnellingConfiguration struct {
 	SentinelsAddressesList []string
 	Password               string
 	Databases              []TunnellingDbConfig
+	RetryBackoff           time.Duration
+	RetryCount             uint
 }
 
 type TunnellingDbConfig struct {
@@ -44,10 +47,17 @@ func (t TunnellingDbConfig) Type() string {
 
 //nolint:golint,gochecknoglobals
 var (
-	ConfigFileKey = "config"
-	SentinelsKey  = "sentinels"
-	PasswordKey   = "password"
-	DatabasesKey  = "databases"
+	ConfigFileKey   = "config"
+	SentinelsKey    = "sentinels"
+	PasswordKey     = "password"
+	DatabasesKey    = "databases"
+	RetryBackoffKey = "retry-backoff"
+	RetryCountKey   = "retry-count"
+)
+
+const (
+	DefaultRetryBackoff = 250 * time.Millisecond
+	DefaultRetryCount   = 5
 )
 
 func RegisterFlags(cmd *cobra.Command) {
@@ -55,6 +65,8 @@ func RegisterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP(SentinelsKey, "s", []string{}, "Comma-separated list of Sentinel addresses")
 	cmd.Flags().StringP(PasswordKey, "p", "", "Sentinel password")
 	cmd.Flags().StringSliceP(DatabasesKey, "d", []string{}, "Comma-separated list of Databases to expose")
+	cmd.Flags().Duration(RetryBackoffKey, DefaultRetryBackoff, "Backoff multiplier for reconnection attempts")
+	cmd.Flags().Uint(RetryCountKey, DefaultRetryCount, "Number of reconnection attempts")
 }
 
 func LoadConfig(cmd *cobra.Command) (TunnellingConfiguration, error) {
@@ -122,6 +134,20 @@ func LoadConfig(cmd *cobra.Command) (TunnellingConfiguration, error) {
 				return config, fmt.Errorf("failed to parse database %s: %w", db, err)
 			}
 			config.Databases = append(config.Databases, db)
+		}
+	}
+
+	if config.RetryBackoff == 0 {
+		config.RetryBackoff, err = cmd.Flags().GetDuration(RetryBackoffKey)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if config.RetryCount == 0 {
+		config.RetryCount, err = cmd.Flags().GetUint(RetryCountKey)
+		if err != nil {
+			panic(err)
 		}
 	}
 
