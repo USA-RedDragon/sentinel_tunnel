@@ -20,6 +20,7 @@ type TunnellingDbConfig struct {
 
 type TunnellingConfiguration struct {
 	SentinelsAddressesList []string
+	Password               string
 	Databases              []TunnellingDbConfig
 }
 
@@ -43,7 +44,7 @@ func NewTunnellingClient(configPath string) (*TunnellingClient, error) {
 	}
 
 	tunnellingClient.sentinelConnection, err =
-		NewConnection(tunnellingClient.configuration.SentinelsAddressesList)
+		NewConnection(tunnellingClient.configuration.SentinelsAddressesList, tunnellingClient.configuration.Password)
 	if err != nil {
 		return nil, fmt.Errorf("an error has occur during sentinel connection creation: %w", err)
 	}

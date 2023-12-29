@@ -50,6 +50,15 @@ func (c *Connection) parseResponse() ([]string, bool, error) {
 	if len(buf) == 0 {
 		return nil, clientClosed, ErrReadFailed
 	}
+	if string(buf) == "+OK" {
+		buf, _, e = c.reader.ReadLine()
+		if e != nil {
+			return nil, clientClosed, ErrReadFailed
+		}
+		if len(buf) == 0 {
+			return nil, clientClosed, ErrReadFailed
+		}
+	}
 	if buf[0] != '*' {
 		return nil, clientNotClosed, fmt.Errorf("%w: %s", ErrInvalidResponse, "first char in mbulk is not *")
 	}
@@ -83,14 +92,22 @@ func (c *Connection) parseResponse() ([]string, bool, error) {
 	return ret, clientNotClosed, nil
 }
 
-func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, bool, error) {
+func (c *Connection) getMasterAddrByNameFromSentinel(dbName, password string) ([]string, bool, error) {
+	var authCmd resp.Array
+	if password != "" {
+		authCmd = resp.Array{
+			resp.BulkString("auth"),
+			resp.BulkString(password),
+		}
+	}
+
 	getMasterCmd := resp.Array{
 		resp.BulkString("sentinel"),
 		resp.BulkString("get-master-addr-by-name"),
 		resp.BulkString(dbName),
 	}
 
-	_, err := c.writer.WriteString(getMasterCmd.String())
+	_, err := c.writer.WriteString(authCmd.String() + getMasterCmd.String())
 	if err != nil {
 		return []string{}, clientClosed, fmt.Errorf("%w: %w", ErrWriteFailed, err)
 	}
@@ -102,9 +119,9 @@ func (c *Connection) getMasterAddrByNameFromSentinel(dbName string) ([]string, b
 	return c.parseResponse()
 }
 
-func (c *Connection) retrieveAddressByDbName() {
+func (c *Connection) retrieveAddressByDbName(password string) {
 	for dbName := range c.getMasterAddressByName {
-		addr, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName)
+		addr, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, password)
 		if err != nil {
 			fmt.Println("err: ", err.Error())
 			if !isClientClosed {
@@ -155,7 +172,7 @@ func (c *Connection) GetAddressByDbName(name string) (string, error) {
 	return reply.reply, reply.err
 }
 
-func NewConnection(addresses []string) (*Connection, error) {
+func NewConnection(addresses []string, password string) (*Connection, error) {
 	connection := Connection{
 		sentinelsAddresses:          addresses,
 		getMasterAddressByName:      make(chan string),
@@ -169,7 +186,7 @@ func NewConnection(addresses []string) (*Connection, error) {
 		return nil, ErrConnect
 	}
 
-	go connection.retrieveAddressByDbName()
+	go connection.retrieveAddressByDbName(password)
 
 	return &connection, nil
 }
