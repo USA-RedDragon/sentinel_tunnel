@@ -45,17 +45,17 @@ export PATH=$PATH:$GOPATH/bin
 
 Configuration can be provided with command line flags, environment variables, or with a config file.
 
-| Env                | Flag          | Description                                 |
-|--------------------|---------------|---------------------------------------------|
-| `TUNNEL_CONFIG`    | `--config`    | Config file path                            |
-| `TUNNEL_SENTINELS` | `--sentinels` | Comma-separated list of Sentinel addresses  |
-| `TUNNEL_PASSWORD`  | `--password`  | Sentinel password                           |
-| `TUNNEL_DATABASES` | `--databases` | Comma-separated list of databases to expose |
+| Env            | Flag          | Description                                 |
+|----------------|---------------|---------------------------------------------|
+| `ST_CONFIG`    | `--config`    | Config file path                            |
+| `ST_SENTINELS` | `--sentinels` | Comma-separated list of Sentinel addresses  |
+| `ST_PASSWORD`  | `--password`  | Sentinel password                           |
+| `ST_DATABASES` | `--databases` | Comma-separated list of databases to expose |
 
 
 ### Config File
 
-The code contains an example configuration file named [`configuration_example.yaml`](configuration_example.yaml). This file can be modified and used with the `--config` flag or the `TUNNEL_CONFIG` env.
+The code contains an example configuration file named [`configuration_example.yaml`](configuration_example.yaml). This file can be modified and used with the `--config` flag or the `ST_CONFIG` env.
 
 ## Run
 
@@ -76,8 +76,8 @@ In order to run `sentinel_tunnel` using Docker:
 ```bash
 docker run -d \
   -p 6379:6379 \
-  -e TUNNEL_SENTINELS=redis:6379
-  -e TUNNEL_DATABASES=mymaster:6379
+  -e ST_SENTINELS=redis:6379
+  -e ST_DATABASES=mymaster:6379
   ghcr.io/usa-reddragon/sentinel_tunnel
 ```
 
