@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -61,15 +62,17 @@ func createTunnelling(conn1 net.Conn, conn2 net.Conn) error {
 
 func handleConnection(c net.Conn, dbName string,
 	getDBAddressByName GetDBAddressByNameFunction) {
-	dbAddress, err := getDBAddressByName(dbName)
+	response, err := getDBAddressByName(dbName)
 	if err != nil {
 		slog.Error("cannot get db address", "db", dbName, "error", err.Error())
+		_, _ = c.Write([]byte(resp.SimpleError("ERR Tunnel failed to get db: " + response).String()))
 		c.Close()
 		return
 	}
-	dbConn, err := net.Dial("tcp", dbAddress)
+	dbConn, err := net.Dial("tcp", response)
 	if err != nil {
 		slog.Error("cannot connect to db", "db", dbName, "error", err.Error())
+		_, _ = c.Write([]byte(resp.SimpleError("ERR Tunnel failed to connect: " + err.Error()).String()))
 		c.Close()
 		return
 	}
