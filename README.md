@@ -43,7 +43,7 @@ export PATH=$PATH:$GOPATH/bin
 
 ## Configure
 
-The code contains an example configuration file named `configuration_example.json`. The configuration file is a json file that contains the following information:
+The code contains an example configuration file named [`configuration_example.yaml`](configuration_example.yaml). The configuration file is a yaml file that contains the following information:
 
 * The Sentinels addresses list
 * Optionally, the Sentinel password
@@ -51,24 +51,16 @@ The code contains an example configuration file named `configuration_example.jso
 
 For example, the following config file contains two Sentinel addresses and two databases. When the client connects to the local port `12345` it actually connect to `db1`.
 
-```json
-{
-    "SentinelsAddressesList":[
-        "node1.local:8001",
-        "node2.local:8001"
-    ],
-    "Password": "",
-    "Databases":[
-        {
-            "Name":"db1",
-            "LocalPort":"12345"
-        },
-        {
-            "Name":"db2",
-            "LocalPort":"12346"
-        }
-    ]
-}
+```yaml
+SentinelsAddressesList:
+  - node1.local:8001
+  - node2.local:8001
+Password: ""
+Databases:
+  - Name: db1
+    LocalPort: 12345
+  - Name: db2
+    LocalPort: 12346
 ```
 
 ## Run
@@ -78,7 +70,7 @@ For example, the following config file contains two Sentinel addresses and two d
 In order to run `sentinel_tunnel` manually:
 
 ```bash
-./sentinel_tunnel <config_file_path>
+./sentinel_tunnel --config=<config_file_path>
 ```
 
 ### Docker
@@ -86,7 +78,7 @@ In order to run `sentinel_tunnel` manually:
 In order to run `sentinel_tunnel` using Docker:
 
 ```bash
-docker run -v <config_file_path>:/config.json -p <local_port>:<port_in_docker> -d ghcr.io/usa-reddragon/sentinel_tunnel
+docker run -v <config_file_path>:/config.yaml -p <local_port>:<port_in_docker> -d ghcr.io/usa-reddragon/sentinel_tunnel
 ```
 
 ## License
