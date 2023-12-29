@@ -32,6 +32,16 @@ func (a Array) String() string {
 	return string(token.Array) + strconv.Itoa(len(a)) + token.EOL + result.String()
 }
 
+// SimpleError builds a simple error
+// See https://redis.io/docs/reference/protocol-spec/#simple-errors
+type SimpleError string
+
+func (s SimpleError) String() string {
+	return string(token.SimpleError) + string(s) + token.EOL
+}
+
+// SimpleString builds a simple string
+// See https://redis.io/docs/reference/protocol-spec/#simple-strings
 type SimpleString string
 
 func (s SimpleString) String() string {

@@ -2,7 +2,7 @@ package token
 
 const (
 	SimpleString = '+'
-	SimpleErr    = '-'
+	SimpleError  = '-'
 	BulkString   = '$'
 	Array        = '*'
 	EOF

@@ -91,8 +91,8 @@ func (c *Connection) parseResponse() ([]string, bool, error) {
 				result = append(result, bulk)
 			}
 			return result, clientNotClosed, nil
-		case token.SimpleErr:
-			return nil, clientNotClosed, fmt.Errorf("%w: got error: %q", ErrInvalidResponse, string(buf))
+		case token.SimpleError:
+			return []string{string(buf[1:])}, clientNotClosed, fmt.Errorf("%w: got error: %q", ErrInvalidResponse, string(buf))
 		default:
 			return nil, clientNotClosed, fmt.Errorf("%w: expected array header: %q", ErrInvalidResponse, string(buf))
 		}
@@ -128,12 +128,16 @@ func (c *Connection) getMasterAddrByNameFromSentinel(dbName, password string) ([
 
 func (c *Connection) retrieveAddressByDbName(password string) {
 	for dbName := range c.getMasterAddressByName {
-		addr, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, password)
+		response, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, password)
 		if err != nil {
 			fmt.Println("err: ", err.Error())
 			if !isClientClosed {
+				var reply string
+				if len(response) != 0 {
+					reply = response[0]
+				}
 				c.getMasterAddressByNameReply <- &GetMasterAddrReply{
-					reply: "",
+					reply: reply,
 					err:   fmt.Errorf("%w: %s", ErrDbName, dbName),
 				}
 			}
@@ -146,7 +150,7 @@ func (c *Connection) retrieveAddressByDbName(password string) {
 			continue
 		}
 		c.getMasterAddressByNameReply <- &GetMasterAddrReply{
-			reply: net.JoinHostPort(addr[0], addr[1]),
+			reply: net.JoinHostPort(response[0], response[1]),
 			err:   nil,
 		}
 	}
