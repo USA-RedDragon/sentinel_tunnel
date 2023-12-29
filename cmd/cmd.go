@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -27,35 +26,25 @@ func NewCommand(version, commit, date string) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-
-	cmd.Flags().StringP("config", "c", "", "Config file path")
-
+	sentinel.RegisterFlags(cmd)
 	return cmd
 }
 
-func run(cmd *cobra.Command, args []string) error {
+func run(cmd *cobra.Command, _ []string) error {
 	slog.Info("Redis Sentinel Tunnel",
 		"version", cmd.Annotations["version"], "commit", cmd.Annotations["commit"], "date", cmd.Annotations["date"])
 
-	var configFile string
-	configFile, err := cmd.Flags().GetString("config")
+	config, err := sentinel.LoadConfig(cmd)
 	if err != nil {
-		panic(err)
-	}
-	if configFile == "" {
-		if len(args) != 0 {
-			configFile = args[0]
-		} else {
-			return ErrMissingConfig
-		}
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	stClient, err := sentinel.NewTunnellingClient(configFile)
+	stClient, err := sentinel.NewTunnellingClient(config)
 	if err != nil {
 		return fmt.Errorf("failed to create tunnelling client: %w", err)
 	}
 
-	if err := stClient.ListenAndServe(context.Background()); err != nil {
+	if err := stClient.ListenAndServe(cmd.Context()); err != nil {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 
