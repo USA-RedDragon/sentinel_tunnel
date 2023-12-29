@@ -13,18 +13,14 @@ import (
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp/token"
 )
 
-type GetMasterAddrReply struct {
-	reply string
-	err   error
-}
-
 type Connection struct {
-	sentinelsAddresses          []string
-	currentConnection           net.Conn
-	reader                      *bufio.Reader
-	writer                      *bufio.Writer
-	getMasterAddressByNameReply chan *GetMasterAddrReply
-	getMasterAddressByName      chan string
+	sentinelsAddresses []string
+	password           string
+	retryBackoff       time.Duration
+	retryCount         uint
+	currentConnection  net.Conn
+	reader             *bufio.Reader
+	writer             *bufio.Writer
 }
 
 const (
@@ -127,34 +123,28 @@ func (c *Connection) getMasterAddrByNameFromSentinel(dbName, password string) ([
 	return c.parseResponse()
 }
 
-func (c *Connection) retrieveAddressByDbName(password string) {
-	for dbName := range c.getMasterAddressByName {
-		response, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, password)
-		if err != nil {
-			slog.Error("failed to get master", "error", err.Error())
-			if !isClientClosed {
-				var reply string
-				if len(response) != 0 {
-					reply = response[0]
-				}
-				c.getMasterAddressByNameReply <- &GetMasterAddrReply{
-					reply: reply,
-					err:   fmt.Errorf("%w: %s", ErrDbName, dbName),
-				}
+func (c *Connection) GetAddressByDbName(dbName string) (string, error) {
+	return c.getAddressByDbName(dbName, 0)
+}
+
+func (c *Connection) getAddressByDbName(dbName string, count uint) (string, error) {
+	response, isClientClosed, err := c.getMasterAddrByNameFromSentinel(dbName, c.password)
+	if err != nil {
+		slog.Error("failed to get master", "error", err.Error())
+		switch {
+		case isClientClosed:
+			if count < c.retryCount && c.reconnectToSentinel() {
+				time.Sleep(time.Duration(count) * c.retryBackoff)
+				return c.getAddressByDbName(dbName, count+1)
 			}
-			if !c.reconnectToSentinel() {
-				c.getMasterAddressByNameReply <- &GetMasterAddrReply{
-					reply: "",
-					err:   ErrConnect,
-				}
-			}
-			continue
-		}
-		c.getMasterAddressByNameReply <- &GetMasterAddrReply{
-			reply: net.JoinHostPort(response[0], response[1]),
-			err:   nil,
+			return "", ErrConnect
+		case len(response) != 0:
+			return response[0], fmt.Errorf("%w: %s", ErrDbName, dbName)
+		default:
+			return "", fmt.Errorf("%w: %s", ErrDbName, dbName)
 		}
 	}
+	return net.JoinHostPort(response[0], response[1]), nil
 }
 
 func (c *Connection) reconnectToSentinel() bool {
@@ -178,27 +168,20 @@ func (c *Connection) reconnectToSentinel() bool {
 	return false
 }
 
-func (c *Connection) GetAddressByDbName(name string) (string, error) {
-	c.getMasterAddressByName <- name
-	reply := <-c.getMasterAddressByNameReply
-	return reply.reply, reply.err
-}
-
-func NewConnection(addresses []string, password string) (*Connection, error) {
+func NewConnection(config TunnellingConfiguration) (*Connection, error) {
 	connection := Connection{
-		sentinelsAddresses:          addresses,
-		getMasterAddressByName:      make(chan string),
-		getMasterAddressByNameReply: make(chan *GetMasterAddrReply),
-		currentConnection:           nil,
-		reader:                      nil,
-		writer:                      nil,
+		sentinelsAddresses: config.SentinelsAddressesList,
+		password:           config.Password,
+		retryBackoff:       config.RetryBackoff,
+		retryCount:         config.RetryCount,
+		currentConnection:  nil,
+		reader:             nil,
+		writer:             nil,
 	}
 
 	if !connection.reconnectToSentinel() {
 		return nil, ErrConnect
 	}
-
-	go connection.retrieveAddressByDbName(password)
 
 	return &connection, nil
 }
