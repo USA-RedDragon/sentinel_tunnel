@@ -7,23 +7,10 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"os"
 
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
-	"github.com/ghodss/yaml"
 	"golang.org/x/sync/errgroup"
 )
-
-type TunnellingDbConfig struct {
-	Name      string
-	LocalPort string
-}
-
-type TunnellingConfiguration struct {
-	SentinelsAddressesList []string
-	Password               string
-	Databases              []TunnellingDbConfig
-}
 
 type TunnellingClient struct {
 	configuration      TunnellingConfiguration
@@ -32,20 +19,16 @@ type TunnellingClient struct {
 
 type GetDBAddressByNameFunction func(dbName string) (string, error)
 
-func NewTunnellingClient(configPath string) (*TunnellingClient, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("an error has occur during configuration read: %w", err)
+func NewTunnellingClient(config TunnellingConfiguration) (*TunnellingClient, error) {
+	tunnellingClient := TunnellingClient{
+		configuration: config,
 	}
 
-	tunnellingClient := TunnellingClient{}
-	err = yaml.Unmarshal(data, &(tunnellingClient.configuration))
-	if err != nil {
-		return nil, fmt.Errorf("an error has occur during configuration unmarshal: %w", err)
-	}
-
-	tunnellingClient.sentinelConnection, err =
-		NewConnection(tunnellingClient.configuration.SentinelsAddressesList, tunnellingClient.configuration.Password)
+	var err error
+	tunnellingClient.sentinelConnection, err = NewConnection(
+		tunnellingClient.configuration.SentinelsAddressesList,
+		tunnellingClient.configuration.Password,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("an error has occur during sentinel connection creation: %w", err)
 	}

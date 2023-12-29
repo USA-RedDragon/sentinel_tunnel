@@ -43,25 +43,19 @@ export PATH=$PATH:$GOPATH/bin
 
 ## Configure
 
-The code contains an example configuration file named [`configuration_example.yaml`](configuration_example.yaml). The configuration file is a yaml file that contains the following information:
+Configuration can be provided with command line flags, environment variables, or with a config file.
 
-* The Sentinels addresses list
-* Optionally, the Sentinel password
-* The list of databases and their corresponding local port
+| Env                | Flag          | Description                                 |
+|--------------------|---------------|---------------------------------------------|
+| `TUNNEL_CONFIG`    | `--config`    | Config file path                            |
+| `TUNNEL_SENTINELS` | `--sentinels` | Comma-separated list of Sentinel addresses  |
+| `TUNNEL_PASSWORD`  | `--password`  | Sentinel password                           |
+| `TUNNEL_DATABASES` | `--databases` | Comma-separated list of databases to expose |
 
-For example, the following config file contains two Sentinel addresses and two databases. When the client connects to the local port `12345` it actually connect to `db1`.
 
-```yaml
-SentinelsAddressesList:
-  - node1.local:8001
-  - node2.local:8001
-Password: ""
-Databases:
-  - Name: db1
-    LocalPort: 12345
-  - Name: db2
-    LocalPort: 12346
-```
+### Config File
+
+The code contains an example configuration file named [`configuration_example.yaml`](configuration_example.yaml). This file can be modified and used with the `--config` flag or the `TUNNEL_CONFIG` env.
 
 ## Run
 
@@ -70,7 +64,9 @@ Databases:
 In order to run `sentinel_tunnel` manually:
 
 ```bash
-./sentinel_tunnel --config=<config_file_path>
+./sentinel_tunnel \
+  --sentinels=redis:6379 \
+  --databases=mymaster:6379
 ```
 
 ### Docker
@@ -78,7 +74,11 @@ In order to run `sentinel_tunnel` manually:
 In order to run `sentinel_tunnel` using Docker:
 
 ```bash
-docker run -v <config_file_path>:/config.yaml -p <local_port>:<port_in_docker> -d ghcr.io/usa-reddragon/sentinel_tunnel
+docker run -d \
+  -p 6379:6379 \
+  -e TUNNEL_SENTINELS=redis:6379
+  -e TUNNEL_DATABASES=mymaster:6379
+  ghcr.io/usa-reddragon/sentinel_tunnel
 ```
 
 ## License
