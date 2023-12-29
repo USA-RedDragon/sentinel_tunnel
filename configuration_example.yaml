@@ -1,0 +1,9 @@
+SentinelsAddressesList:
+  - node1.local:8001
+  - node2.local:8001
+Password: ""
+Databases:
+  - Name: db1
+    LocalPort: "12345"
+  - Name: db2
+    LocalPort: "12346"

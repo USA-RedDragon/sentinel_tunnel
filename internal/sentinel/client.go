@@ -2,7 +2,6 @@ package sentinel
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"os"
 
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
+	"github.com/ghodss/yaml"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -39,7 +39,7 @@ func NewTunnellingClient(configPath string) (*TunnellingClient, error) {
 	}
 
 	tunnellingClient := TunnellingClient{}
-	err = json.Unmarshal(data, &(tunnellingClient.configuration))
+	err = yaml.Unmarshal(data, &(tunnellingClient.configuration))
 	if err != nil {
 		return nil, fmt.Errorf("an error has occur during configuration unmarshal: %w", err)
 	}
