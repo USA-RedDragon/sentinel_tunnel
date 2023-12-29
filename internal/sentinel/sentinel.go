@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
+	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp/token"
 )
 
 type GetMasterAddrReply struct {
@@ -36,78 +37,84 @@ var (
 	ErrWriteFailed     = errors.New("failed write to client")
 	ErrInvalidResponse = errors.New("invalid response")
 	ErrNullRequest     = errors.New("null request")
-	ErrWrongBulkSize   = errors.New("wrong bulk size")
+	ErrWrongBulkSize   = errors.New("bulk string size did not match header")
 	ErrDbName          = errors.New("failed to retrieve db name from the sentinel")
 	ErrConnect         = errors.New("failed to connect to any of the sentinel services")
 )
 
 func (c *Connection) parseResponse() ([]string, bool, error) {
-	var ret []string
-	buf, _, e := c.reader.ReadLine()
-	if e != nil {
-		return nil, clientClosed, ErrReadFailed
-	}
-	if len(buf) == 0 {
-		return nil, clientClosed, ErrReadFailed
-	}
-	if string(buf) == "+OK" {
-		buf, _, e = c.reader.ReadLine()
-		if e != nil {
+	for {
+		buf, _, e := c.reader.ReadLine()
+		if e != nil || len(buf) == 0 {
 			return nil, clientClosed, ErrReadFailed
 		}
-		if len(buf) == 0 {
-			return nil, clientClosed, ErrReadFailed
+
+		switch buf[0] {
+		case token.SimpleString:
+			switch string(buf[1:]) {
+			case "OK":
+				continue
+			default:
+				return nil, clientNotClosed, fmt.Errorf("%w: unexpected string: %q", ErrInvalidResponse, string(buf))
+			}
+		case token.Array:
+			arrayLen, err := strconv.Atoi(string(buf[1:]))
+			if err != nil || arrayLen == -1 {
+				return nil, clientNotClosed, ErrNullRequest
+			}
+
+			result := make([]string, 0, arrayLen)
+			for i := 0; i < arrayLen; i++ {
+				buf, _, err := c.reader.ReadLine()
+				if err != nil || len(buf) == 0 {
+					return nil, clientClosed, ErrReadFailed
+				}
+				if buf[0] != token.BulkString {
+					return nil, clientNotClosed, fmt.Errorf("%w: expected bulk string header: %q", ErrInvalidResponse, string(buf))
+				}
+
+				bulkSize, err := strconv.Atoi(string(buf[1:]))
+				if err != nil {
+					return nil, clientNotClosed, ErrNullRequest
+				}
+
+				buf, _, err = c.reader.ReadLine()
+				if err != nil {
+					return nil, clientClosed, ErrReadFailed
+				}
+
+				bulk := string(buf)
+				if len(bulk) != bulkSize {
+					return nil, clientNotClosed, ErrWrongBulkSize
+				}
+
+				result = append(result, bulk)
+			}
+			return result, clientNotClosed, nil
+		case token.SimpleErr:
+			return nil, clientNotClosed, fmt.Errorf("%w: got error: %q", ErrInvalidResponse, string(buf))
+		default:
+			return nil, clientNotClosed, fmt.Errorf("%w: expected array header: %q", ErrInvalidResponse, string(buf))
 		}
 	}
-	if buf[0] != '*' {
-		return nil, clientNotClosed, fmt.Errorf("%w: %s", ErrInvalidResponse, "first char in mbulk is not *")
-	}
-	mbulkSize, _ := strconv.Atoi(string(buf[1:]))
-	if mbulkSize == -1 {
-		return nil, clientNotClosed, ErrNullRequest
-	}
-	ret = make([]string, mbulkSize)
-	for i := 0; i < mbulkSize; i++ {
-		buf1, _, e1 := c.reader.ReadLine()
-		if e1 != nil {
-			return nil, clientClosed, ErrReadFailed
-		}
-		if len(buf1) == 0 {
-			return nil, clientClosed, ErrReadFailed
-		}
-		if buf1[0] != '$' {
-			return nil, clientNotClosed, fmt.Errorf("%w: %s", ErrInvalidResponse, "first char in bulk is not $")
-		}
-		bulkSize, _ := strconv.Atoi(string(buf1[1:]))
-		buf2, _, e2 := c.reader.ReadLine()
-		if e2 != nil {
-			return nil, clientClosed, ErrReadFailed
-		}
-		bulk := string(buf2)
-		if len(bulk) != bulkSize {
-			return nil, clientNotClosed, ErrWrongBulkSize
-		}
-		ret[i] = bulk
-	}
-	return ret, clientNotClosed, nil
 }
 
 func (c *Connection) getMasterAddrByNameFromSentinel(dbName, password string) ([]string, bool, error) {
-	var authCmd resp.Array
+	var cmd resp.Command
 	if password != "" {
-		authCmd = resp.Array{
+		cmd = append(cmd, resp.Array{
 			resp.BulkString("auth"),
 			resp.BulkString(password),
-		}
+		})
 	}
 
-	getMasterCmd := resp.Array{
+	cmd = append(cmd, resp.Array{
 		resp.BulkString("sentinel"),
 		resp.BulkString("get-master-addr-by-name"),
 		resp.BulkString(dbName),
-	}
+	})
 
-	_, err := c.writer.WriteString(authCmd.String() + getMasterCmd.String())
+	_, err := c.writer.WriteString(cmd.String())
 	if err != nil {
 		return []string{}, clientClosed, fmt.Errorf("%w: %w", ErrWriteFailed, err)
 	}
