@@ -47,4 +47,27 @@ jobs:
           args: ${{ steps.vars.outputs.args }}
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+      - name: Push beta image
+        if: github.ref_name == 'main'
+        run: |
+          export REPO="$(tr '[[:upper:]]' '[[:lower:]]' <<< "ghcr.io/$GITHUB_REPOSITORY")"
+          IMAGES=()
+          while read -r SOURCE DEST; do
+            docker tag "$SOURCE" "$DEST"
+            docker push "$DEST"
+            IMAGES+=("$DEST")
+          done \
+            < <(docker image ls --format=json | \
+              yq --input-format=json --output-format=tsv '
+                select(.Repository == strenv(REPO)) |
+                [
+                  .Repository + ":" + .Tag,
+                  .Repository + ":beta-" + (.Tag | sub(".*-", ""))
+                ]
+              ')
+
+          docker manifest create "$REPO:beta" "${IMAGES[@]}"
+          docker manifest push "$REPO:beta"
+
       - uses: creekorful/goreportcard-action@v1.0
