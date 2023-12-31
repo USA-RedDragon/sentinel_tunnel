@@ -1,9 +1,6 @@
 name: Release
 
-on:
-  push:
-    tags:
-      - "v*"
+on: push
 
 jobs:
   release:
@@ -33,11 +30,21 @@ jobs:
           platforms: amd64,arm64,arm
 
       - run: go generate ./...
+
+      - name: Set build variables
+        id: vars
+        run: |
+          args='release --clean'
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            args+=' --snapshot'
+          fi
+          echo "args=$args" >> $GITHUB_OUTPUT
+
       - name: Release
         uses: goreleaser/goreleaser-action@v5
         with:
           version: latest
-          args: release --clean
+          args: ${{ steps.vars.outputs.args }}
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - uses: creekorful/goreportcard-action@v1.0
