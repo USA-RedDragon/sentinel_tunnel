@@ -1,7 +1,7 @@
 package resp
 
 import (
-	"fmt"
+	"strconv"
 	"testing"
 )
 
@@ -39,18 +39,14 @@ func TestRespSimpleStringEncode(t *testing.T) {
 
 func BenchmarkRespSimpleErrorEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		testErr := fmt.Errorf("Testing Simple Error %d", i)
-		b.StartTimer()
-		_ = SimpleError(testErr.Error()).String()
+		testErr := "Testing Simple Error " + strconv.Itoa(i)
+		_ = SimpleError(testErr).String()
 	}
 }
 
 func BenchmarkRespSimpleStringEncode(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		testStr := fmt.Sprintf("Testing Simple String %d", i)
-		b.StartTimer()
+		testStr := "Testing Simple String " + strconv.Itoa(i)
 		_ = SimpleString(testStr).String()
 	}
 }
