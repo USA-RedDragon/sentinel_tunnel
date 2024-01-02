@@ -7,9 +7,15 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/USA-RedDragon/sentinel_tunnel/internal/sentinel/resp"
 	"golang.org/x/sync/errgroup"
+)
+
+const (
+	ReadHeaderTimeout = 3 * time.Second
 )
 
 type TunnellingClient struct {
@@ -101,6 +107,30 @@ func (stClient *TunnellingClient) ListenAndServe(ctx context.Context) error {
 			)
 		})
 	}
+
+	http.HandleFunc("/health", stClient.Health)
+	server := &http.Server{
+		Addr:              stClient.configuration.HTTPAddr,
+		ReadHeaderTimeout: ReadHeaderTimeout,
+	}
+	group.Go(func() error {
+		if err := server.ListenAndServe(); err != nil {
+			return fmt.Errorf("failed to start http server: %w", err)
+		}
+		return nil
+	})
+
+	group.Go(func() error {
+		<-ctx.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		//nolint:contextcheck
+		if err := server.Shutdown(ctx); err != nil {
+			return fmt.Errorf("graceful http shutdown failed: %w", err)
+		}
+		return nil
+	})
+
 	//nolint:wrapcheck
 	return group.Wait()
 }
