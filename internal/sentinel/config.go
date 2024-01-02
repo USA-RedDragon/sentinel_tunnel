@@ -19,6 +19,7 @@ type TunnellingConfiguration struct {
 	Databases              []TunnellingDbConfig
 	RetryBackoff           time.Duration
 	RetryCount             uint
+	HTTPAddr               string
 }
 
 type TunnellingDbConfig struct {
@@ -53,11 +54,13 @@ var (
 	DatabasesKey    = "databases"
 	RetryBackoffKey = "retry-backoff"
 	RetryCountKey   = "retry-count"
+	HTTPAddrKey     = "http-addr"
 )
 
 const (
 	DefaultRetryBackoff = 250 * time.Millisecond
 	DefaultRetryCount   = 5
+	DefaultHTTPAddr     = ":6060"
 )
 
 func RegisterFlags(cmd *cobra.Command) {
@@ -67,6 +70,7 @@ func RegisterFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP(DatabasesKey, "d", []string{}, "Comma-separated list of Databases to expose")
 	cmd.Flags().Duration(RetryBackoffKey, DefaultRetryBackoff, "Backoff multiplier for reconnection attempts")
 	cmd.Flags().Uint(RetryCountKey, DefaultRetryCount, "Number of reconnection attempts")
+	cmd.Flags().String(HTTPAddrKey, DefaultHTTPAddr, "Listen address for health server")
 }
 
 func LoadConfig(cmd *cobra.Command) (TunnellingConfiguration, error) {
@@ -146,6 +150,13 @@ func LoadConfig(cmd *cobra.Command) (TunnellingConfiguration, error) {
 
 	if config.RetryCount == 0 {
 		config.RetryCount, err = cmd.Flags().GetUint(RetryCountKey)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	if config.HTTPAddr == "" {
+		config.HTTPAddr, err = cmd.Flags().GetString(HTTPAddrKey)
 		if err != nil {
 			panic(err)
 		}
