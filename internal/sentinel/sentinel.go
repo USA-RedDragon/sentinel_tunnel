@@ -30,6 +30,7 @@ const (
 )
 
 var (
+	ErrNotConnected    = errors.New("not connected to Sentinel")
 	ErrReadFailed      = errors.New("failed read line from client")
 	ErrWriteFailed     = errors.New("failed write to client")
 	ErrInvalidResponse = errors.New("invalid response")
@@ -40,6 +41,10 @@ var (
 )
 
 func (c *Connection) parseResponse() ([]string, bool, error) {
+	if c.reader == nil {
+		return []string{}, clientClosed, ErrNotConnected
+	}
+
 	for {
 		buf, _, e := c.reader.ReadLine()
 		if e != nil || len(buf) == 0 {
@@ -97,6 +102,10 @@ func (c *Connection) parseResponse() ([]string, bool, error) {
 }
 
 func (c *Connection) getMasterAddrByNameFromSentinel(dbName, password string) ([]string, bool, error) {
+	if c.writer == nil {
+		return []string{}, clientClosed, ErrNotConnected
+	}
+
 	var cmd resp.Command
 	if password != "" {
 		cmd = append(cmd, resp.Array{
