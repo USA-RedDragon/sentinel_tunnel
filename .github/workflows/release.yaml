@@ -7,54 +7,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  args:
-    runs-on: ubuntu-22.04
-    outputs:
-      args: ${{ steps.vars.outputs.args }}
-    steps:
-      - name: Set build variables
-        id: vars
-        run: |
-          args=''
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
-            args+='--snapshot'
-          fi
-          echo "args=$args" >> $GITHUB_OUTPUT
-
   release:
     name: Release
-    needs: args
     permissions:
       contents: write
       packages: write
-    uses: USA-RedDragon/reusable-actions/.github/workflows/goreleaser.yaml@v1.0.19
+    uses: USA-RedDragon/reusable-actions/.github/workflows/goreleaser.yaml@v1.0.20
     with:
-      extra-args: ${{ needs.args.outputs.args }}
+      beta: ${{ github.ref_name == 'main' }}
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
-
-  push:
-    needs: release
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Push beta image
-        if: github.ref_name == 'main'
-        run: |
-          export REPO="$(tr '[[:upper:]]' '[[:lower:]]' <<< "ghcr.io/$GITHUB_REPOSITORY")"
-          IMAGES=()
-          while read -r SOURCE DEST; do
-            docker tag "$SOURCE" "$DEST"
-            docker push "$DEST"
-            IMAGES+=("$DEST")
-          done \
-            < <(docker image ls --format=json | \
-              yq --input-format=json --output-format=tsv '
-                select(.Repository == strenv(REPO)) |
-                [
-                  .Repository + ":" + .Tag,
-                  .Repository + ":beta-" + (.Tag | sub(".*-", ""))
-                ]
-              ')
-
-          docker manifest create "$REPO:beta" "${IMAGES[@]}"
-          docker manifest push "$REPO:beta"
