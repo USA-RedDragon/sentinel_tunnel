@@ -2,52 +2,41 @@ name: Release
 
 on: push
 
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: false
+
 jobs:
-  release:
-    name: Release
+  args:
     runs-on: ubuntu-22.04
+    outputs:
+      args: ${{ steps.vars.outputs.args }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64,arm64,arm
-
-      - run: go generate ./...
-
       - name: Set build variables
         id: vars
         run: |
-          args='release --clean'
+          args=''
           if [[ "$GITHUB_REF" != refs/tags/* ]]; then
-            args+=' --snapshot'
+            args+='--snapshot'
           fi
           echo "args=$args" >> $GITHUB_OUTPUT
 
-      - name: Release
-        uses: goreleaser/goreleaser-action@v5
-        with:
-          version: latest
-          args: ${{ steps.vars.outputs.args }}
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+  release:
+    name: Release
+    needs: args
+    permissions:
+      contents: write
+      packages: write
+    uses: USA-RedDragon/reusable-actions/.github/workflows/goreleaser.yaml@v1.0.19
+    with:
+      extra-args: ${{ needs.args.outputs.args }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
 
+  push:
+    needs: release
+    runs-on: ubuntu-22.04
+    steps:
       - name: Push beta image
         if: github.ref_name == 'main'
         run: |
@@ -69,5 +58,3 @@ jobs:
 
           docker manifest create "$REPO:beta" "${IMAGES[@]}"
           docker manifest push "$REPO:beta"
-
-      - uses: creekorful/goreportcard-action@v1.0
