@@ -1,6 +1,6 @@
 module github.com/USA-RedDragon/sentinel_tunnel
 
-go 1.22.3
+go 1.22.4
 
 require (
 	github.com/ghodss/yaml v1.0.0
